@@ -112,9 +112,11 @@ On first launch without a `config.json`, a settings dialog will appear where you
 
 ## Cost
 
-- **Groq Whisper**: ~$0.04/hour of audio
-- **OpenAI gpt-4o-mini**: ~$0.01 per correction call (very cheap)
-- **Groq LLM** (alternative): Free tier available
+The running cost is negligible. With daily use over an entire month, total API spend stayed **well under $1**.
+
+- **Groq Whisper**: ~$0.04/hour of audio (each dictation is just a few seconds)
+- **OpenAI gpt-4o-mini**: fractions of a cent per correction call
+- **Groq LLM** (alternative): free tier available
 
 ## License
 
