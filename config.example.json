@@ -1,0 +1,15 @@
+{
+  "api_key": "gsk_your_groq_api_key_here",
+  "model": "whisper-large-v3-turbo",
+  "language": "en",
+  "correction_provider": "openai",
+  "openai_api_key": "sk-proj-your_openai_api_key_here",
+  "hotkey_modifiers": ["ctrl", "super"],
+  "audio_device": null,
+  "remove_fillers": true,
+  "voice_commands_enabled": false,
+  "keyboard_commands": {
+    "send it": "Return"
+  },
+  "shell_commands": {}
+}
