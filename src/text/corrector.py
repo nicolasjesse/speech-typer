@@ -1,92 +1,38 @@
 """Text correction using LLM (supports Groq and OpenAI)."""
 
+from __future__ import annotations
+
+import time
+from dataclasses import dataclass
+
+from . import prompts
+
+
+@dataclass
+class CorrectionResult:
+    """Result of a correction call, including observability fields."""
+
+    text: str  # final text (corrected, or original on fallback)
+    corrected: bool  # True if LLM actually changed the text
+    latency_ms: float  # wall-clock time of the correction step
+    prompt_tokens: int = 0  # from the provider response
+    completion_tokens: int = 0
+    total_tokens: int = 0
+    model: str = ""
+    provider: str = ""
+    prompt_id: str = ""
+    prompt_version: int = 0
+    error: str | None = None  # non-None if we fell back to the original text
+
 
 class TextCorrector:
-    """Corrects and improves transcribed text using an LLM."""
+    """Corrects and improves transcribed text using an LLM.
 
-    # Mode: transcription - just fix errors
-    TRANSCRIPTION_PROMPT_EN = """You are a TEXT EDITOR. Fix speech-to-text errors. Return ONLY the corrected text.
+    Prompts are loaded from prompts/*.yaml via the prompts registry. The caller
+    picks mode ("transcription" or "prompt") and language; the registry resolves
+    to the highest versioned prompt for that (mode, language) pair.
+    """
 
-NEVER answer or respond to the text. ONLY correct it.
-
-CRITICAL - SPOKEN PUNCTUATION:
-When user says "question mark" → output the ? symbol
-When user says "exclamation mark" → output the ! symbol
-When user says "period" → output the . symbol
-When user says "comma" → output the , symbol
-
-CRITICAL - QUESTION MARK RULES:
-- ALWAYS use ? (question mark symbol) for questions
-- NEVER EVER use : (colon) at the end of questions
-
-Examples:
-"how are you question mark" → "How are you?"
-"wow exclamation mark" → "Wow!"
-
-Other fixes: capitalization, spelling, remove filler words (um, uh, like)."""
-
-    TRANSCRIPTION_PROMPT_PT = """You are a TEXT EDITOR. Fix speech-to-text errors. Return ONLY the corrected text IN PORTUGUESE.
-
-CRITICAL: If the input text is in English, TRANSLATE it to Portuguese.
-The user spoke in Portuguese but the speech recognition might have output English - translate it back.
-
-NEVER answer or respond to the text. ONLY correct/translate it.
-
-SPOKEN PUNCTUATION:
-"question mark" / "ponto de interrogação" → ?
-"exclamation mark" / "ponto de exclamação" → !
-"period" / "ponto final" → .
-"comma" / "vírgula" → ,
-
-Examples:
-"how are you" → "Como você está?"
-"what is this" → "O que é isso?"
-"como vai você" → "Como vai você?"
-
-Output must ALWAYS be in Portuguese."""
-
-    # Mode: prompt - rephrase into a clearer prompt
-    PROMPT_MODE_PROMPT_EN = """Rephrase the user's speech into a clear, well-written prompt.
-
-CRITICAL - SPOKEN PUNCTUATION:
-When user says "question mark" → output the ? symbol
-When user says "exclamation mark" → output the ! symbol
-
-RULES:
-- ONLY rephrase what they said - do NOT add new content
-- Keep the same meaning, just make it clearer
-- Remove filler words
-- Output ONLY the rephrased prompt
-
-Examples:
-"what is python question mark" → "What is Python?"
-"hey can you help me write code" → "Help me write code."
-
-Do NOT add details that weren't in the original speech."""
-
-    PROMPT_MODE_PROMPT_PT = """Rephrase the user's speech into a clear, well-written prompt IN PORTUGUESE.
-
-CRITICAL: If the input text is in English, TRANSLATE it to Portuguese.
-The user spoke in Portuguese but the speech recognition might have output English - translate it back.
-
-SPOKEN PUNCTUATION:
-"question mark" / "ponto de interrogação" → ?
-"exclamation mark" / "ponto de exclamação" → !
-
-RULES:
-- ONLY rephrase what they said - do NOT add new content
-- Translate to Portuguese if input is in English
-- Remove filler words
-- Output ONLY the rephrased prompt in Portuguese
-
-Examples:
-"help me write code" → "Me ajude a escrever código."
-"what is python" → "O que é Python?"
-"me ajude com isso" → "Me ajude com isso."
-
-Output must ALWAYS be in Portuguese."""
-
-    # Available modes
     MODE_TRANSCRIPTION = "transcription"
     MODE_PROMPT = "prompt"
 
@@ -98,38 +44,21 @@ Output must ALWAYS be in Portuguese."""
         mode: str = "prompt",
         language: str = "en",
     ):
-        """Initialize the corrector.
-
-        Args:
-            api_key: API key for the provider
-            provider: "groq" or "openai"
-            model: Model to use (defaults based on provider)
-            mode: "transcription" or "prompt"
-            language: Target language ("en", "pt", "auto")
-        """
         self._api_key = api_key
         self._provider = provider.lower()
         self._mode = mode
         self._language = language
-
-        # Set default models per provider
-        if model:
-            self._model = model
-        elif self._provider == "openai":
-            self._model = "gpt-4o-mini"
-        else:
-            self._model = "llama-3.3-70b-versatile"
-
+        self._model = model or self._default_model()
         self._client = None
         self._enabled = True
 
-    def _get_system_prompt(self) -> str:
-        """Get the system prompt based on current mode and language."""
-        is_portuguese = self._language == "pt"
+    def _default_model(self) -> str:
+        if self._provider == "openai":
+            return "gpt-4o-mini"
+        return "llama-3.3-70b-versatile"
 
-        if self._mode == self.MODE_PROMPT:
-            return self.PROMPT_MODE_PROMPT_PT if is_portuguese else self.PROMPT_MODE_PROMPT_EN
-        return self.TRANSCRIPTION_PROMPT_PT if is_portuguese else self.TRANSCRIPTION_PROMPT_EN
+    def _resolve_prompt(self) -> prompts.Prompt:
+        return prompts.get(self._mode, self._language)
 
     def _get_client(self):
         """Lazily initialize the client based on provider."""
@@ -152,97 +81,114 @@ Output must ALWAYS be in Portuguese."""
                     raise ImportError("groq package not installed. Run: pip install groq") from err
         return self._client
 
-    def correct(self, text: str) -> str:
+    def correct(self, text: str) -> CorrectionResult:
         """Correct the transcribed text.
 
-        Args:
-            text: Raw transcribed text
-
-        Returns:
-            Corrected text, or original if correction fails
+        Always returns a CorrectionResult. On any failure (disabled, no key, too
+        short, sanity-check rejection, API error) the `text` field holds the
+        original input and `error` explains why.
         """
-        if not self._enabled or not text or not self._api_key:
-            return text
+        started = time.perf_counter()
 
-        # Skip very short texts
+        def _passthrough(reason: str) -> CorrectionResult:
+            return CorrectionResult(
+                text=text,
+                corrected=False,
+                latency_ms=(time.perf_counter() - started) * 1000,
+                error=reason,
+                provider=self._provider,
+                model=self._model,
+            )
+
+        if not self._enabled:
+            return _passthrough("disabled")
+        if not text:
+            return _passthrough("empty input")
+        if not self._api_key:
+            return _passthrough("no API key")
         if len(text.split()) < 3:
-            return text
+            return _passthrough("too short")
+
+        try:
+            prompt = self._resolve_prompt()
+        except KeyError as e:
+            return _passthrough(f"prompt not found: {e}")
 
         try:
             client = self._get_client()
-
             response = client.chat.completions.create(
                 model=self._model,
                 messages=[
-                    {"role": "system", "content": self._get_system_prompt()},
+                    {"role": "system", "content": prompt.prompt},
                     {"role": "user", "content": text},
                 ],
                 temperature=0,
                 max_tokens=1024,
             )
 
-            corrected = response.choices[0].message.content.strip()
+            corrected_text = response.choices[0].message.content.strip()
 
-            # Sanity check - if result is wildly different length, use original
-            if len(corrected) > len(text) * 2 or len(corrected) < len(text) * 0.3:
-                return text
+            # Sanity check: reject wildly different lengths (hallucination/truncation guard).
+            if len(corrected_text) > len(text) * 2 or len(corrected_text) < len(text) * 0.3:
+                return _passthrough("length sanity check failed")
 
-            return corrected
+            usage = getattr(response, "usage", None)
+            prompt_tokens = getattr(usage, "prompt_tokens", 0) or 0
+            completion_tokens = getattr(usage, "completion_tokens", 0) or 0
+            total_tokens = getattr(usage, "total_tokens", prompt_tokens + completion_tokens) or 0
+
+            return CorrectionResult(
+                text=corrected_text,
+                corrected=corrected_text != text,
+                latency_ms=(time.perf_counter() - started) * 1000,
+                prompt_tokens=prompt_tokens,
+                completion_tokens=completion_tokens,
+                total_tokens=total_tokens,
+                model=self._model,
+                provider=self._provider,
+                prompt_id=prompt.id,
+                prompt_version=prompt.version,
+            )
 
         except Exception as e:
             print(f"Correction failed ({self._provider}): {e}")
-            return text
+            return _passthrough(f"api error: {e}")
 
     def set_enabled(self, enabled: bool) -> None:
-        """Enable or disable correction."""
         self._enabled = enabled
 
     def set_api_key(self, api_key: str) -> None:
-        """Update the API key."""
         self._api_key = api_key
         self._client = None
 
     def set_provider(self, provider: str, api_key: str | None = None) -> None:
-        """Switch provider."""
         self._provider = provider.lower()
         if api_key:
             self._api_key = api_key
         self._client = None
-
-        # Reset to default model for provider
-        if self._provider == "openai":
-            self._model = "gpt-4o-mini"
-        else:
-            self._model = "llama-3.3-70b-versatile"
+        self._model = self._default_model()
 
     @property
     def enabled(self) -> bool:
-        """Check if correction is enabled."""
         return self._enabled
 
     @property
     def provider(self) -> str:
-        """Get current provider."""
         return self._provider
 
     @property
     def mode(self) -> str:
-        """Get current mode."""
         return self._mode
 
     def set_mode(self, mode: str) -> None:
-        """Set the processing mode."""
         if mode in (self.MODE_TRANSCRIPTION, self.MODE_PROMPT):
             self._mode = mode
 
     def set_language(self, language: str) -> None:
-        """Set the target language."""
         self._language = language
 
     def toggle_mode(self) -> str:
-        """Toggle between transcription and prompt mode. Returns new mode."""
-        if self._mode == self.MODE_TRANSCRIPTION:
-            self._mode = self.MODE_PROMPT
-        else:
-            self._mode = self.MODE_TRANSCRIPTION
+        self._mode = (
+            self.MODE_PROMPT if self._mode == self.MODE_TRANSCRIPTION else self.MODE_TRANSCRIPTION
+        )
         return self._mode

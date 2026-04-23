@@ -31,6 +31,7 @@ dependencies = [
     "openai>=1.0.0",
     "pynput>=1.7.6",
     "evdev>=1.6.0",
+    "PyYAML>=6.0",
 ]
 
 [project.optional-dependencies]
@@ -72,6 +73,7 @@ select = [
 ignore = [
     "E501",  # line too long - handled by formatter
     "B008",  # function call in default argument (fine for FastAPI-style code)
+    "RUF001", "RUF002", "RUF003",  # ambiguous unicode (× is intentional in math docs)
 ]
 
 [tool.ruff.lint.per-file-ignores]

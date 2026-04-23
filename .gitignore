@@ -39,3 +39,10 @@ env/
 # OS
 .DS_Store
 Thumbs.db
+
+# Eval artifacts — the .md report is committed, the .json isn't
+evals/last_report.json
+
+# Metrics output (written to XDG_DATA_HOME by default, but ignore if someone
+# redirects to the repo)
+metrics.jsonl

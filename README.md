@@ -25,12 +25,21 @@ Primary target: **Pop!_OS 24.04 with COSMIC (Wayland)**. It also works on GNOME/
 - **Platform-aware** — automatically routes to `dotool` (COSMIC), `wtype` (other Wayland), or `xdotool` (X11)
 - **System tray** with mode/language switcher and hot config reload
 
-## Architecture
+## Engineering highlights
 
-See [ARCHITECTURE.md](ARCHITECTURE.md) for the full pipeline, threading model, and platform-detection logic. Quick version:
+The pieces I'd want a reviewer to look at:
+
+- **[`prompts/`](prompts/)** — versioned YAML prompts (`transcription_en.v1.yaml` etc.) loaded by a registry in [`src/text/prompts.py`](src/text/prompts.py). Prompts are artifacts, not inline strings.
+- **[`evals/`](evals/)** — golden-set harness ([`evals/run.py`](evals/run.py)) that runs the correction layer against ~15 labeled cases and reports exact-match, similarity, latency, and cost per case with a per-tag breakdown. Re-run on every prompt change; diff [`evals/last_report.md`](evals/last_report.md) to see regressions.
+- **[`src/core/metrics.py`](src/core/metrics.py)** — append-only JSONL telemetry for every request (tokens, latency, estimated cost, prompt version). Summarize with [`scripts/report.py`](scripts/report.py) — useful for verifying the "<$1/month" cost claim empirically.
+- **[`src/text/corrector.py`](src/text/corrector.py)** — multi-provider LLM abstraction (Groq ↔ OpenAI) with guardrails: skip on empty/short input, length-based sanity check (reject outputs <0.3× or >2× the input), graceful fallback to raw transcription on any failure. Returns a structured `CorrectionResult` with observability fields.
+- **[`src/core/session.py`](src/core/session.py)** — runtime detection of X11 / Wayland / COSMIC with the routing logic that picks `dotool` / `wtype` / `xdotool` accordingly. The original reason this project needed to exist.
+
+See [ARCHITECTURE.md](ARCHITECTURE.md) for the full pipeline, threading model, and extension points. Quick version:
 
 ```
 hotkey press → mic → Groq Whisper → filler removal → LLM correction → text injection
+                       (timing + cost per request logged to metrics.jsonl)
 ```
 
 ## Quick start
@@ -75,6 +84,54 @@ Edit `config.json` (or use the settings dialog):
 | `shell_commands` | | `{"open terminal": "gnome-terminal"}` |
 
 ¹ Required only if `correction_provider` is `"openai"`. Set to `"groq"` to use a single API key for both transcription and correction.
+
+## Evaluation
+
+Holler's LLM correction layer has a regression test suite — see [`evals/`](evals/). Each run prints an exact-match rate, similarity score, p50/p95 latency, and total cost, plus a per-tag breakdown:
+
+```bash
+make eval                                   # uses your config.json API keys
+python evals/run.py --provider groq         # or switch provider
+python evals/run.py --cases en_spoken_qmark # or run one case
+```
+
+The golden set ([`evals/golden_set.yaml`](evals/golden_set.yaml)) covers spoken punctuation, bilingual translate-back, rephrase-vs-preserve fidelity, and guardrails against LLM hallucinations. Extend it whenever a real-world bug escapes — that's how the set stays useful instead of stale.
+
+The last-run report is committed at [`evals/last_report.md`](evals/last_report.md), so prompt changes can be reviewed as a diff.
+
+## Observability
+
+Every dictation request appends one JSONL record to `$XDG_DATA_HOME/holler/metrics.jsonl` (default `~/.local/share/holler/metrics.jsonl`) with:
+
+- timestamp, mode, language
+- audio duration, transcription latency, transcription cost
+- correction model + provider, correction latency, token counts, correction cost
+- prompt id + version (so you can catch regressions after a prompt bump)
+- `corrected` flag (did the LLM actually change the text?)
+
+Summarize with:
+
+```bash
+make report              # last 30 days
+make report-all          # full history
+python scripts/report.py --days 7
+```
+
+Sample output:
+
+```
+Requests:           42
+Total audio:        186.3s (3.11 min)
+Total cost:         $0.003102
+Avg cost/request:   $0.000074
+
+Latency (total, p50 / p95 / p99):
+  980ms / 1.32s / 1.58s
+```
+
+## Prompts
+
+Prompts live in [`prompts/*.yaml`](prompts/) with a metadata header (id, version, mode, language, description, updated_at) plus the prompt body. The loader at [`src/text/prompts.py`](src/text/prompts.py) picks the highest version for each `(mode, language)` pair, so multiple versions can coexist during A/B testing. See [`prompts/README.md`](prompts/README.md) for the prompt-change workflow.
 
 ## Manual setup (power users)
 
@@ -135,12 +192,14 @@ Running cost is negligible — daily use over a month stays **well under $1**:
 make dev         # install ruff + pytest into the venv
 make lint        # ruff check + format check
 make fix         # auto-apply safe ruff fixes + reformat
-make test        # pytest (skips gracefully until tests/ exists)
+make test        # run pytest (46 tests, ~0.1s)
 make run         # run Holler in the foreground
+make eval        # run LLM correction evals against the golden set
+make report      # summarize metrics.jsonl
 make clean       # remove venv + caches
 ```
 
-Run `make` with no arguments for the full list of targets.
+Run `make` with no arguments for the full target list.
 
 See [ARCHITECTURE.md](ARCHITECTURE.md) for the module layout and extension points.
 

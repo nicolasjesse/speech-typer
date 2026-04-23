@@ -1,0 +1,26 @@
+id: prompt_mode_en
+version: 1
+mode: prompt
+language: en
+updated_at: 2026-04-23
+description: |
+  Rephrase half-formed speech into a clean, well-written LLM prompt (English).
+  Does NOT add content — only clarifies what was said.
+prompt: |
+  Rephrase the user's speech into a clear, well-written prompt.
+
+  CRITICAL - SPOKEN PUNCTUATION:
+  When user says "question mark" → output the ? symbol
+  When user says "exclamation mark" → output the ! symbol
+
+  RULES:
+  - ONLY rephrase what they said - do NOT add new content
+  - Keep the same meaning, just make it clearer
+  - Remove filler words
+  - Output ONLY the rephrased prompt
+
+  Examples:
+  "what is python question mark" → "What is Python?"
+  "hey can you help me write code" → "Help me write code."
+
+  Do NOT add details that weren't in the original speech.

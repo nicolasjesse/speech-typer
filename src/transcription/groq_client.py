@@ -1,6 +1,8 @@
 """Groq Whisper API client for transcription."""
 
 import io
+import time
+import wave
 from dataclasses import dataclass
 
 
@@ -10,7 +12,9 @@ class TranscriptionResult:
 
     text: str
     language: str | None = None
-    duration: float | None = None
+    audio_duration_s: float = 0.0  # length of the audio clip in seconds
+    latency_ms: float = 0.0  # wall-clock time of the API call
+    model: str = ""
     error: str | None = None
 
     @property
@@ -46,11 +50,20 @@ class GroqTranscriber:
 
     def transcribe(self, wav_data: bytes) -> TranscriptionResult:
         """Transcribe WAV audio data."""
+        audio_duration_s = _wav_duration_seconds(wav_data)
+
         if not wav_data:
-            return TranscriptionResult(text="", error="No audio data provided")
+            return TranscriptionResult(text="", error="No audio data provided", model=self._model)
 
         if not self._api_key:
-            return TranscriptionResult(text="", error="API key not configured")
+            return TranscriptionResult(
+                text="",
+                error="API key not configured",
+                audio_duration_s=audio_duration_s,
+                model=self._model,
+            )
+
+        started = time.perf_counter()
 
         try:
             client = self._get_client()
@@ -76,6 +89,9 @@ class GroqTranscriber:
             return TranscriptionResult(
                 text=text,
                 language=self._language,
+                audio_duration_s=audio_duration_s,
+                latency_ms=(time.perf_counter() - started) * 1000,
+                model=self._model,
             )
 
         except Exception as e:
@@ -87,7 +103,13 @@ class GroqTranscriber:
             elif "connection" in error_msg.lower():
                 error_msg = "Connection error - check internet"
 
-            return TranscriptionResult(text="", error=error_msg)
+            return TranscriptionResult(
+                text="",
+                error=error_msg,
+                audio_duration_s=audio_duration_s,
+                latency_ms=(time.perf_counter() - started) * 1000,
+                model=self._model,
+            )
 
     def set_api_key(self, api_key: str) -> None:
         """Update the API key."""
@@ -97,3 +119,16 @@ class GroqTranscriber:
     def set_language(self, language: str) -> None:
         """Update the transcription language."""
         self._language = language
+
+
+def _wav_duration_seconds(wav_data: bytes) -> float:
+    """Best-effort duration parse from a WAV byte blob. Returns 0.0 on failure."""
+    if not wav_data:
+        return 0.0
+    try:
+        with wave.open(io.BytesIO(wav_data), "rb") as wav:
+            frames = wav.getnframes()
+            rate = wav.getframerate() or 1
+            return frames / float(rate)
+    except Exception:
+        return 0.0

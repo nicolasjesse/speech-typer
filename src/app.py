@@ -9,6 +9,7 @@ from PyQt5.QtWidgets import QApplication, QMessageBox
 from .audio.recorder import AudioRecorder
 from .commands.command_handler import CommandHandler
 from .core.config import Config
+from .core.metrics import MetricsLogger
 from .core.session import Session
 from .input.injector import TextInjector
 from .text.corrector import TextCorrector
@@ -68,6 +69,9 @@ class HollerApp:
         )
 
         self._injector = TextInjector(self._session)
+
+        # Metrics logger (JSONL to $XDG_DATA_HOME/holler/metrics.jsonl)
+        self._metrics = MetricsLogger()
 
         # Initialize voice command handler
         self._command_handler = CommandHandler(
@@ -207,8 +211,17 @@ class HollerApp:
                 # Format the text
                 formatted = self._formatter.format(result.text)
                 # Apply LLM correction for better quality
-                corrected = self._corrector.correct(formatted)
-                self._signals.transcription_done.emit(corrected)
+                correction = self._corrector.correct(formatted)
+
+                # Log one metric per completed request (fire-and-forget)
+                self._metrics.record_request(
+                    mode=self._corrector.mode,
+                    language=self._config.language,
+                    transcription=result,
+                    correction=correction,
+                )
+
+                self._signals.transcription_done.emit(correction.text)
             else:
                 self._signals.error.emit(result.error or "Transcription failed")
 

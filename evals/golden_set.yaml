@@ -1,0 +1,138 @@
+# Golden set for Holler's LLM correction layer.
+#
+# Each case captures: the raw Whisper transcript (as spoken), the expected
+# corrected output, mode (transcription|prompt), language, and tags that
+# describe what the case exercises. The eval harness runs each case through
+# the current TextCorrector and reports exact-match + similarity + latency +
+# cost per case, plus aggregates.
+#
+# Cases are deliberately small and varied — enough to catch regressions when
+# prompts change, not enough to be a benchmark. Expand with new cases each
+# time a real-world bug escapes into production.
+
+cases:
+  # ---------------------------------------------------------------------
+  # Transcription mode, English
+  # ---------------------------------------------------------------------
+
+  - id: en_basic_filler
+    mode: transcription
+    language: en
+    tags: [filler, capitalization]
+    input: "um so i wanted to ask you a question"
+    expected: "I wanted to ask you a question."
+
+  - id: en_spoken_qmark
+    mode: transcription
+    language: en
+    tags: [spoken_punctuation, questions]
+    input: "how are you today question mark"
+    expected: "How are you today?"
+
+  - id: en_spoken_exclaim
+    mode: transcription
+    language: en
+    tags: [spoken_punctuation]
+    input: "wow that's amazing exclamation mark"
+    expected: "Wow, that's amazing!"
+
+  - id: en_embedded_comma_period
+    mode: transcription
+    language: en
+    tags: [spoken_punctuation]
+    input: "first comma we need a plan period then we execute period"
+    expected: "First, we need a plan. Then we execute."
+
+  - id: en_preserve_meaning
+    mode: transcription
+    language: en
+    tags: [fidelity]
+    input: "the meeting has been moved to three pm tomorrow"
+    expected: "The meeting has been moved to 3 PM tomorrow."
+
+  - id: en_no_answer_only_edit
+    mode: transcription
+    language: en
+    tags: [safety, no_answer]
+    # Guardrail: the model must correct this, not answer the question.
+    input: "what is the capital of france question mark"
+    expected: "What is the capital of France?"
+
+  - id: en_technical_terms
+    mode: transcription
+    language: en
+    tags: [technical, preservation]
+    input: "deploy the postgres container to kubernetes"
+    expected: "Deploy the Postgres container to Kubernetes."
+
+  # ---------------------------------------------------------------------
+  # Transcription mode, Portuguese
+  # ---------------------------------------------------------------------
+
+  - id: pt_basic
+    mode: transcription
+    language: pt
+    tags: [portuguese, capitalization]
+    input: "então eu queria te perguntar uma coisa"
+    expected: "Então, eu queria te perguntar uma coisa."
+
+  - id: pt_translate_back
+    mode: transcription
+    language: pt
+    # Whisper often outputs English even when the user spoke Portuguese.
+    # The prompt instructs: translate back.
+    tags: [portuguese, whisper_misdetect]
+    input: "hello how are you"
+    expected: "Olá, como você está?"
+
+  - id: pt_spoken_punctuation
+    mode: transcription
+    language: pt
+    tags: [portuguese, spoken_punctuation]
+    input: "isso é incrível ponto de exclamação"
+    expected: "Isso é incrível!"
+
+  # ---------------------------------------------------------------------
+  # Prompt mode, English
+  # ---------------------------------------------------------------------
+
+  - id: en_prompt_rephrase_simple
+    mode: prompt
+    language: en
+    tags: [prompt_mode, rephrase]
+    input: "hey can you help me write some python code"
+    expected: "Help me write some Python code."
+
+  - id: en_prompt_question_form
+    mode: prompt
+    language: en
+    tags: [prompt_mode, questions]
+    input: "what is python question mark"
+    expected: "What is Python?"
+
+  - id: en_prompt_no_invention
+    mode: prompt
+    language: en
+    # Must NOT invent specifics. This is the failure mode for PROMPT rewrites.
+    tags: [prompt_mode, no_hallucination]
+    input: "help me debug this thing"
+    expected: "Help me debug this."
+
+  # ---------------------------------------------------------------------
+  # Prompt mode, Portuguese
+  # ---------------------------------------------------------------------
+
+  - id: pt_prompt_basic
+    mode: prompt
+    language: pt
+    tags: [prompt_mode, portuguese]
+    input: "me ajuda a escrever código em python"
+    expected: "Me ajude a escrever código em Python."
+
+  - id: pt_prompt_translate
+    mode: prompt
+    language: pt
+    # Same translate-back guardrail as transcription mode.
+    tags: [prompt_mode, portuguese, whisper_misdetect]
+    input: "help me write some code"
+    expected: "Me ajude a escrever código."

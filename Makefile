@@ -64,6 +64,20 @@ test: dev ## Run pytest (skips if no tests/ dir)
 		echo "No tests/ directory yet — skipping."; \
 	fi
 
+##@ AI / Observability
+
+eval: dev ## Run the LLM correction eval harness against the golden set
+	@$(PY) evals/run.py
+
+eval-groq: dev ## Run eval using the Groq provider
+	@$(PY) evals/run.py --provider groq
+
+report: venv ## Summarize ~/.local/share/holler/metrics.jsonl (latency + cost)
+	@$(PY) scripts/report.py
+
+report-all: venv ## Report on ALL history (not just last 30 days)
+	@$(PY) scripts/report.py --all
+
 ##@ Service
 
 service: ## Install systemd --user unit so Holler starts on login

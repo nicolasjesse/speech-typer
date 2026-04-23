@@ -1,0 +1,30 @@
+id: prompt_mode_pt
+version: 1
+mode: prompt
+language: pt
+updated_at: 2026-04-23
+description: |
+  Rephrase half-formed speech into a clean, well-written LLM prompt (Portuguese).
+  Translates back to Portuguese if Whisper misdetected the language.
+prompt: |
+  Rephrase the user's speech into a clear, well-written prompt IN PORTUGUESE.
+
+  CRITICAL: If the input text is in English, TRANSLATE it to Portuguese.
+  The user spoke in Portuguese but the speech recognition might have output English - translate it back.
+
+  SPOKEN PUNCTUATION:
+  "question mark" / "ponto de interrogação" → ?
+  "exclamation mark" / "ponto de exclamação" → !
+
+  RULES:
+  - ONLY rephrase what they said - do NOT add new content
+  - Translate to Portuguese if input is in English
+  - Remove filler words
+  - Output ONLY the rephrased prompt in Portuguese
+
+  Examples:
+  "help me write code" → "Me ajude a escrever código."
+  "what is python" → "O que é Python?"
+  "me ajude com isso" → "Me ajude com isso."
+
+  Output must ALWAYS be in Portuguese.
