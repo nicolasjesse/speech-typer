@@ -1,7 +1,6 @@
 """Groq Whisper API client for transcription."""
 
 import io
-from typing import Optional
 from dataclasses import dataclass
 
 
@@ -10,9 +9,9 @@ class TranscriptionResult:
     """Result from transcription."""
 
     text: str
-    language: Optional[str] = None
-    duration: Optional[float] = None
-    error: Optional[str] = None
+    language: str | None = None
+    duration: float | None = None
+    error: str | None = None
 
     @property
     def success(self) -> bool:
@@ -39,9 +38,10 @@ class GroqTranscriber:
         if self._client is None:
             try:
                 from groq import Groq
+
                 self._client = Groq(api_key=self._api_key)
-            except ImportError:
-                raise ImportError("groq package not installed. Run: pip install groq")
+            except ImportError as err:
+                raise ImportError("groq package not installed. Run: pip install groq") from err
         return self._client
 
     def transcribe(self, wav_data: bytes) -> TranscriptionResult:

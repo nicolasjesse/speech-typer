@@ -1,9 +1,8 @@
 """Clipboard operations for X11 and Wayland."""
 
 import subprocess
-from typing import Optional
 
-from ..core.session import Session, SessionType
+from ..core.session import Session
 
 
 class Clipboard:
@@ -20,7 +19,7 @@ class Clipboard:
         else:
             return self._copy_x11(text)
 
-    def paste(self) -> Optional[str]:
+    def paste(self) -> str | None:
         """Get text from clipboard."""
         if self._session.is_wayland:
             return self._paste_wayland()
@@ -69,7 +68,7 @@ class Clipboard:
             print(f"Error copying to clipboard: {e}")
             return False
 
-    def _paste_x11(self) -> Optional[str]:
+    def _paste_x11(self) -> str | None:
         """Get from X11 clipboard using xclip."""
         try:
             proc = subprocess.run(
@@ -83,7 +82,7 @@ class Clipboard:
         except Exception:
             return None
 
-    def _paste_wayland(self) -> Optional[str]:
+    def _paste_wayland(self) -> str | None:
         """Get from Wayland clipboard using wl-paste."""
         try:
             proc = subprocess.run(

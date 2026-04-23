@@ -1,13 +1,13 @@
-"""Entry point for PontySpeech."""
+"""Entry point for Holler."""
 
 import sys
 
 
 def main():
     """Main entry point."""
-    from .app import PontySpeechApp
+    from .app import HollerApp
 
-    app = PontySpeechApp()
+    app = HollerApp()
     sys.exit(app.run())
 
 

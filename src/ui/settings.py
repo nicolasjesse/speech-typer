@@ -1,21 +1,30 @@
 """Settings dialog."""
 
-from typing import Callable, Optional, List
-from PyQt5.QtWidgets import (
-    QDialog, QVBoxLayout, QHBoxLayout, QFormLayout,
-    QLabel, QLineEdit, QComboBox, QCheckBox, QPushButton,
-    QMessageBox, QGroupBox
-)
-from PyQt5.QtCore import Qt
+from collections.abc import Callable
+from typing import ClassVar
 
-from ..core.config import Config
+from PyQt5.QtWidgets import (
+    QCheckBox,
+    QComboBox,
+    QDialog,
+    QFormLayout,
+    QGroupBox,
+    QHBoxLayout,
+    QLabel,
+    QLineEdit,
+    QMessageBox,
+    QPushButton,
+    QVBoxLayout,
+)
+
 from ..audio.recorder import AudioRecorder
+from ..core.config import Config
 
 
 class SettingsDialog(QDialog):
     """Settings configuration dialog."""
 
-    LANGUAGES = [
+    LANGUAGES: ClassVar[list[tuple[str, str]]] = [
         ("Auto-detect", "auto"),
         ("English", "en"),
         ("Spanish", "es"),
@@ -32,10 +41,7 @@ class SettingsDialog(QDialog):
     ]
 
     def __init__(
-        self,
-        config: Config,
-        on_save: Optional[Callable[[Config], None]] = None,
-        parent=None
+        self, config: Config, on_save: Callable[[Config], None] | None = None, parent=None
     ):
         super().__init__(parent)
         self._config = config
@@ -45,7 +51,7 @@ class SettingsDialog(QDialog):
 
     def _setup_ui(self) -> None:
         """Setup the dialog UI."""
-        self.setWindowTitle("PontySpeech Settings")
+        self.setWindowTitle("Holler Settings")
         self.setMinimumWidth(400)
 
         layout = QVBoxLayout(self)
@@ -154,6 +160,7 @@ class SettingsDialog(QDialog):
             return
 
         from ..transcription.groq_client import GroqTranscriber
+
         transcriber = GroqTranscriber(api_key)
 
         success, message = transcriber.test_connection()

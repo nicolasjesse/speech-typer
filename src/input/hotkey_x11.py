@@ -1,7 +1,6 @@
 """X11 global hotkey handling using pynput."""
 
-import threading
-from typing import Callable, Optional, List, Set
+from collections.abc import Callable
 
 
 class HotkeyX11:
@@ -9,9 +8,9 @@ class HotkeyX11:
 
     def __init__(
         self,
-        modifiers: List[str],
-        on_press: Optional[Callable[[], None]] = None,
-        on_release: Optional[Callable[[], None]] = None,
+        modifiers: list[str],
+        on_press: Callable[[], None] | None = None,
+        on_release: Callable[[], None] | None = None,
     ):
         """Initialize hotkey listener.
 
@@ -25,10 +24,10 @@ class HotkeyX11:
         self._on_release = on_release
         self._listener = None
         self._running = False
-        self._pressed_modifiers: Set[str] = set()
+        self._pressed_modifiers: set[str] = set()
         self._hotkey_active = False
 
-    def _key_to_modifier(self, key) -> Optional[str]:
+    def _key_to_modifier(self, key) -> str | None:
         """Convert a pynput key to our modifier name."""
         try:
             from pynput.keyboard import Key
@@ -108,7 +107,7 @@ class HotkeyX11:
         self._pressed_modifiers.clear()
         self._hotkey_active = False
 
-    def set_modifiers(self, modifiers: List[str]) -> None:
+    def set_modifiers(self, modifiers: list[str]) -> None:
         """Change the hotkey modifiers."""
         was_running = self._running
         if was_running:

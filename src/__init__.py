@@ -1,1 +1,1 @@
-# PontySpeech - Voice dictation for Linux
+# Holler - Voice dictation for Linux

@@ -4,7 +4,6 @@ import os
 import subprocess
 from dataclasses import dataclass
 from enum import Enum
-from typing import Optional
 
 
 class SessionType(Enum):
@@ -122,12 +121,7 @@ class Session:
     def check_input_group(self) -> bool:
         """Check if user is in the input group (required for evdev on Wayland)."""
         try:
-            result = subprocess.run(
-                ["groups"],
-                capture_output=True,
-                text=True,
-                timeout=5
-            )
+            result = subprocess.run(["groups"], capture_output=True, text=True, timeout=5)
             return "input" in result.stdout.split()
         except Exception:
             return False
@@ -136,12 +130,7 @@ class Session:
     def _command_exists(command: str) -> bool:
         """Check if a command exists in PATH."""
         try:
-            subprocess.run(
-                ["which", command],
-                capture_output=True,
-                check=True,
-                timeout=5
-            )
+            subprocess.run(["which", command], capture_output=True, check=True, timeout=5)
             return True
         except (subprocess.CalledProcessError, subprocess.TimeoutExpired):
             return False

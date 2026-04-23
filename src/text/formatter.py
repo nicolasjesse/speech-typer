@@ -1,14 +1,14 @@
 """Text formatting and filler word removal."""
 
 import re
-from typing import Optional
+from typing import ClassVar
 
 
 class TextFormatter:
     """Formats transcribed text by removing fillers and cleaning up."""
 
     # Common filler words/phrases to remove
-    FILLER_PATTERNS = [
+    FILLER_PATTERNS: ClassVar[list[str]] = [
         r"\b(um+|uh+|er+|ah+)\b",
         r"\b(like,?\s*)+(?=\w)",  # "like" as filler
         r"\b(you know,?\s*)+",
@@ -23,10 +23,7 @@ class TextFormatter:
     def __init__(self, remove_fillers: bool = True):
         """Initialize formatter."""
         self._remove_fillers = remove_fillers
-        self._filler_regex = re.compile(
-            "|".join(self.FILLER_PATTERNS),
-            re.IGNORECASE
-        )
+        self._filler_regex = re.compile("|".join(self.FILLER_PATTERNS), re.IGNORECASE)
 
     def format(self, text: str) -> str:
         """Apply all formatting to text."""
@@ -64,11 +61,7 @@ class TextFormatter:
         result = text[0].upper() + text[1:] if len(text) > 1 else text.upper()
 
         # Capitalize after sentence-ending punctuation
-        result = re.sub(
-            r'([.!?]\s+)([a-z])',
-            lambda m: m.group(1) + m.group(2).upper(),
-            result
-        )
+        result = re.sub(r"([.!?]\s+)([a-z])", lambda m: m.group(1) + m.group(2).upper(), result)
 
         return result
 
@@ -77,13 +70,13 @@ class TextFormatter:
         result = text
 
         # Remove multiple punctuation marks (keep first)
-        result = re.sub(r'([.!?,;:])\1+', r'\1', result)
+        result = re.sub(r"([.!?,;:])\1+", r"\1", result)
 
         # Remove space before punctuation
-        result = re.sub(r'\s+([.!?,;:])', r'\1', result)
+        result = re.sub(r"\s+([.!?,;:])", r"\1", result)
 
         # Ensure space after punctuation (except at end)
-        result = re.sub(r'([.!?,;:])([A-Za-z])', r'\1 \2', result)
+        result = re.sub(r"([.!?,;:])([A-Za-z])", r"\1 \2", result)
 
         # Add period at end if missing punctuation
         result = result.strip()
@@ -95,7 +88,7 @@ class TextFormatter:
     def _clean_whitespace(self, text: str) -> str:
         """Clean up extra whitespace."""
         # Collapse multiple spaces
-        result = re.sub(r' +', ' ', text)
+        result = re.sub(r" +", " ", text)
 
         # Remove leading/trailing whitespace
         result = result.strip()

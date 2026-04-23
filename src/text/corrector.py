@@ -1,7 +1,5 @@
 """Text correction using LLM (supports Groq and OpenAI)."""
 
-from typing import Optional
-
 
 class TextCorrector:
     """Corrects and improves transcribed text using an LLM."""
@@ -10,9 +8,6 @@ class TextCorrector:
     TRANSCRIPTION_PROMPT_EN = """You are a TEXT EDITOR. Fix speech-to-text errors. Return ONLY the corrected text.
 
 NEVER answer or respond to the text. ONLY correct it.
-
-CRITICAL - COMPANY NAME:
-When user says "Ponte", "Ponti", "Pony", "Pont", "Punty" or similar → correct to "Ponty" (the company name)
 
 CRITICAL - SPOKEN PUNCTUATION:
 When user says "question mark" → output the ? symbol
@@ -27,7 +22,6 @@ CRITICAL - QUESTION MARK RULES:
 Examples:
 "how are you question mark" → "How are you?"
 "wow exclamation mark" → "Wow!"
-"the Ponte project" → "the Ponty project"
 
 Other fixes: capitalization, spelling, remove filler words (um, uh, like)."""
 
@@ -37,9 +31,6 @@ CRITICAL: If the input text is in English, TRANSLATE it to Portuguese.
 The user spoke in Portuguese but the speech recognition might have output English - translate it back.
 
 NEVER answer or respond to the text. ONLY correct/translate it.
-
-CRITICAL - COMPANY NAME:
-When user says "Ponte", "Ponti", "Pony", "Pont", "Punty" or similar → correct to "Ponty" (the company name)
 
 SPOKEN PUNCTUATION:
 "question mark" / "ponto de interrogação" → ?
@@ -51,15 +42,11 @@ Examples:
 "how are you" → "Como você está?"
 "what is this" → "O que é isso?"
 "como vai você" → "Como vai você?"
-"o projeto da Ponte" → "o projeto da Ponty"
 
 Output must ALWAYS be in Portuguese."""
 
     # Mode: prompt - rephrase into a clearer prompt
     PROMPT_MODE_PROMPT_EN = """Rephrase the user's speech into a clear, well-written prompt.
-
-CRITICAL - COMPANY NAME:
-When user says "Ponte", "Ponti", "Pony", "Pont", "Punty" or similar → correct to "Ponty" (the company name)
 
 CRITICAL - SPOKEN PUNCTUATION:
 When user says "question mark" → output the ? symbol
@@ -74,7 +61,6 @@ RULES:
 Examples:
 "what is python question mark" → "What is Python?"
 "hey can you help me write code" → "Help me write code."
-"update the Ponte website" → "Update the Ponty website."
 
 Do NOT add details that weren't in the original speech."""
 
@@ -82,9 +68,6 @@ Do NOT add details that weren't in the original speech."""
 
 CRITICAL: If the input text is in English, TRANSLATE it to Portuguese.
 The user spoke in Portuguese but the speech recognition might have output English - translate it back.
-
-CRITICAL - COMPANY NAME:
-When user says "Ponte", "Ponti", "Pony", "Pont", "Punty" or similar → correct to "Ponty" (the company name)
 
 SPOKEN PUNCTUATION:
 "question mark" / "ponto de interrogação" → ?
@@ -100,7 +83,6 @@ Examples:
 "help me write code" → "Me ajude a escrever código."
 "what is python" → "O que é Python?"
 "me ajude com isso" → "Me ajude com isso."
-"atualize o site da Ponte" → "Atualize o site da Ponty."
 
 Output must ALWAYS be in Portuguese."""
 
@@ -112,7 +94,7 @@ Output must ALWAYS be in Portuguese."""
         self,
         api_key: str,
         provider: str = "groq",
-        model: Optional[str] = None,
+        model: str | None = None,
         mode: str = "prompt",
         language: str = "en",
     ):
@@ -155,15 +137,19 @@ Output must ALWAYS be in Portuguese."""
             if self._provider == "openai":
                 try:
                     from openai import OpenAI
+
                     self._client = OpenAI(api_key=self._api_key)
-                except ImportError:
-                    raise ImportError("openai package not installed. Run: pip install openai")
+                except ImportError as err:
+                    raise ImportError(
+                        "openai package not installed. Run: pip install openai"
+                    ) from err
             else:
                 try:
                     from groq import Groq
+
                     self._client = Groq(api_key=self._api_key)
-                except ImportError:
-                    raise ImportError("groq package not installed. Run: pip install groq")
+                except ImportError as err:
+                    raise ImportError("groq package not installed. Run: pip install groq") from err
         return self._client
 
     def correct(self, text: str) -> str:
@@ -189,7 +175,7 @@ Output must ALWAYS be in Portuguese."""
                 model=self._model,
                 messages=[
                     {"role": "system", "content": self._get_system_prompt()},
-                    {"role": "user", "content": text}
+                    {"role": "user", "content": text},
                 ],
                 temperature=0,
                 max_tokens=1024,
@@ -216,7 +202,7 @@ Output must ALWAYS be in Portuguese."""
         self._api_key = api_key
         self._client = None
 
-    def set_provider(self, provider: str, api_key: Optional[str] = None) -> None:
+    def set_provider(self, provider: str, api_key: str | None = None) -> None:
         """Switch provider."""
         self._provider = provider.lower()
         if api_key:

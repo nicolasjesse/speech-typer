@@ -1,4 +1,4 @@
-"""Voice commands module for PontySpeech."""
+"""Voice commands module for Holler."""
 
 from .command_handler import CommandHandler, CommandResult
 

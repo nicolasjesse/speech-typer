@@ -1,123 +1,143 @@
-# Speech Typer
+# Holler
 
-A lightweight push-to-talk voice dictation tool for Linux. Hold a hotkey, speak, release — your words get transcribed and typed into the active window.
+[![CI](https://github.com/nicolasjesse/holler/actions/workflows/ci.yml/badge.svg)](https://github.com/nicolasjesse/holler/actions/workflows/ci.yml)
+[![Python](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-Uses [Groq's Whisper API](https://console.groq.com/) for fast speech-to-text and an LLM (OpenAI or Groq) for cleaning up transcription errors.
+> Push-to-talk voice dictation for Linux. Hold a hotkey, speak, release — transcribed text appears in whatever window is focused.
 
-> **Primary target: Pop!_OS 24.04 with COSMIC desktop (Wayland).** It may work on other Wayland compositors (GNOME, Sway, Hyprland) and X11, but COSMIC is the only tested and actively supported configuration.
+Holler streams audio through [Groq's Whisper API](https://console.groq.com/) for fast speech-to-text, then runs the result through an LLM (OpenAI or Groq) that fixes transcription errors, handles spoken punctuation, and optionally rephrases half-formed thoughts into clean prompts.
 
-## How It Works
+## Why this exists
 
-1. **Hold** `Ctrl + Super` (Windows key) while speaking
-2. **Release** when done
-3. Your transcribed text is automatically typed into whatever window is focused
+Voice dictation on Linux — especially on Wayland compositors like COSMIC — is a mess. `wtype` misbehaves on some compositors, `ydotool` needs a daemon, and no stock tool ships with LLM correction. Holler is the dictation tool I wanted: a single hotkey, usable everywhere, with transcription quality that matches what's possible in 2026.
 
-The app runs in the system tray with minimal resource usage.
+Primary target: **Pop!_OS 24.04 with COSMIC (Wayland)**. It also works on GNOME/KDE Wayland, Sway, Hyprland, and X11 — platform detection in [`src/core/session.py`](src/core/session.py) picks the right backend at runtime.
 
 ## Features
 
-- **Push-to-talk recording** with configurable hotkey
-- **Groq Whisper** transcription (~$0.04/hour of audio)
-- **LLM text correction** — fixes transcription errors, handles spoken punctuation ("question mark" becomes `?`), removes filler words
-- **Two modes**: Transcription (literal dictation) and Prompt (rephrases into clear prompts)
-- **Multi-language**: English, Portuguese, and 10+ other languages
-- **Voice commands**: Trigger keyboard shortcuts or shell commands by voice
-- **Platform-aware**: Uses `dotool` on COSMIC, `wtype` on other Wayland compositors, `xdotool` on X11
+- **Push-to-talk** with a configurable hotkey (default `Ctrl + Super`)
+- **Groq Whisper** transcription (`whisper-large-v3-turbo`, ~$0.04/hour of audio)
+- **LLM correction** — fixes spelling, handles spoken punctuation (`"question mark"` → `?`), removes filler words
+- **Two modes** — *transcription* (literal dictation) and *prompt* (rephrase into a clean LLM prompt)
+- **Multilingual** — English, Portuguese, 10+ others
+- **Voice commands** — map spoken phrases to keyboard shortcuts or shell commands
+- **Platform-aware** — automatically routes to `dotool` (COSMIC), `wtype` (other Wayland), or `xdotool` (X11)
+- **System tray** with mode/language switcher and hot config reload
+
+## Architecture
+
+See [ARCHITECTURE.md](ARCHITECTURE.md) for the full pipeline, threading model, and platform-detection logic. Quick version:
+
+```
+hotkey press → mic → Groq Whisper → filler removal → LLM correction → text injection
+```
 
 ## Setup
 
-### 1. System Dependencies
+### 1. System dependencies
 
-**Pop!_OS 24.04 (COSMIC):**
+**Pop!_OS 24.04 (COSMIC) or any Wayland compositor:**
 
 ```bash
-# Audio capture
-sudo apt install libportaudio2
-
-# Wayland clipboard
-sudo apt install wl-clipboard
-
-# Text injection (dotool) — build from source
-# https://sr.ht/~geb/dotool/
-# Or install via your preferred method
-
-# Add your user to the input group (required for hotkey detection on Wayland)
-sudo usermod -aG input $USER
-# Then logout and login again
+sudo apt install libportaudio2 wl-clipboard
+# Plus dotool (preferred) — see https://sr.ht/~geb/dotool/
+# Add your user to the input group so evdev can read hotkeys on Wayland:
+sudo usermod -aG input $USER   # log out and back in after
 ```
 
-**Other Debian/Ubuntu (X11):**
+**X11 (Debian/Ubuntu):**
 
 ```bash
 sudo apt install libportaudio2 xclip xdotool
 ```
 
-### 2. Python Dependencies
+### 2. Python
 
 ```bash
 python3 -m venv .env
 source .env/bin/activate
-pip install -r requirements.txt
+pip install -e .           # or: pip install -r requirements.txt
+```
+
+For development:
+
+```bash
+pip install -e ".[dev]"
 ```
 
 ### 3. Configuration
 
-Copy the example config and fill in your API keys:
-
 ```bash
 cp config.example.json config.json
+# edit config.json with your keys
 ```
-
-Then edit `config.json` with your keys:
 
 | Property | Required | Description |
 |---|---|---|
-| `api_key` | **Yes** | Groq API key for Whisper transcription. Get one at https://console.groq.com/ |
-| `openai_api_key` | No* | OpenAI API key for LLM text correction. Get one at https://platform.openai.com/ |
-| `correction_provider` | No | `"openai"` (default) or `"groq"` — which LLM to use for text correction |
-| `model` | No | Whisper model (default: `whisper-large-v3-turbo`) |
-| `language` | No | Transcription language code (default: `"en"`) |
-| `hotkey_modifiers` | No | Keys to hold for recording (default: `["ctrl", "super"]`) |
-| `audio_device` | No | Microphone device ID, `null` for system default |
-| `remove_fillers` | No | Remove "um", "uh", "like" etc. (default: `true`) |
-| `voice_commands_enabled` | No | Enable voice commands (default: `false`) |
-| `keyboard_commands` | No | Map spoken phrases to key presses, e.g. `{"send it": "Return"}` |
-| `shell_commands` | No | Map spoken phrases to shell commands |
+| `api_key` | ✅ | Groq API key — https://console.groq.com/ |
+| `openai_api_key` | conditional¹ | OpenAI key for correction — https://platform.openai.com/ |
+| `correction_provider` | | `"openai"` (default) or `"groq"` |
+| `model` | | Whisper model (default `whisper-large-v3-turbo`) |
+| `language` | | `"en"`, `"pt"`, `"auto"`, etc. |
+| `hotkey_modifiers` | | default `["ctrl", "super"]` |
+| `audio_device` | | `null` = system default |
+| `remove_fillers` | | default `true` |
+| `voice_commands_enabled` | | default `false` |
+| `keyboard_commands` | | `{"send it": "Return"}` |
+| `shell_commands` | | `{"open terminal": "gnome-terminal"}` |
 
-*If `correction_provider` is `"openai"`, then `openai_api_key` is required. If set to `"groq"`, the Groq `api_key` is used for both transcription and correction.
+¹ Required only if `correction_provider` is `"openai"`. Set to `"groq"` to use a single API key for both transcription and correction.
 
 ### 4. Run
 
 ```bash
 python run.py
+# or, after pip install -e .
+holler
 ```
 
-On first launch without a `config.json`, a settings dialog will appear where you can enter your API key and select your microphone.
+On first launch without a `config.json`, a settings dialog appears where you can paste your API key and pick a microphone.
 
-## Important Notes for COSMIC Desktop
+## COSMIC-specific notes
 
-- **`wtype` does not work correctly on COSMIC** — it reports success but types wrong characters. Speech Typer automatically detects COSMIC and uses `dotool` instead.
-- You **must** be in the `input` group for hotkey detection to work on Wayland. Run `sudo usermod -aG input $USER` and re-login.
-- `dotool` must be installed and accessible in your PATH.
+- `wtype` reports success but types wrong characters on COSMIC. Holler auto-detects COSMIC and routes to `dotool` instead — see [ARCHITECTURE.md#why-dotool-on-cosmic-specifically](ARCHITECTURE.md#why-dotool-on-cosmic-specifically).
+- You **must** be in the `input` group for hotkey detection on Wayland.
+- `dotool` must be installed and on `PATH`.
 
 ## Troubleshooting
 
-| Problem | Solution |
+| Problem | Fix |
 |---|---|
-| "Failed to start hotkey listener" | Make sure you're in the `input` group and have logged out/in after adding |
-| "Failed to paste text" | Install `wl-clipboard` and `dotool` (Wayland) or `xdotool` and `xclip` (X11) |
-| No audio captured | Install `libportaudio2` and check microphone in Settings |
-| Wrong characters typed (numbers) | You're likely on COSMIC — update to the latest version which auto-detects COSMIC |
-| Transcription errors | Try switching `correction_provider` to `"groq"` if OpenAI is unavailable |
+| "Failed to start hotkey listener" | Join the `input` group and re-login |
+| "Failed to paste text" | Install `wl-clipboard`+`dotool` (Wayland) or `xdotool`+`xclip` (X11) |
+| No audio captured | Install `libportaudio2`, check the mic in Settings |
+| Wrong characters typed | You're on COSMIC — update to latest, it auto-detects COSMIC |
+| Transcription errors | Try `correction_provider: "groq"` |
 
 ## Cost
 
-The running cost is negligible. With daily use over an entire month, total API spend stayed **well under $1**.
+Running cost is negligible — daily use over a month stays **well under $1**:
 
-- **Groq Whisper**: ~$0.04/hour of audio (each dictation is just a few seconds)
-- **OpenAI gpt-4o-mini**: fractions of a cent per correction call
-- **Groq LLM** (alternative): free tier available
+- **Groq Whisper**: ~$0.04/hour of audio (each dictation is a few seconds)
+- **OpenAI `gpt-4o-mini`** correction: fractions of a cent per call
+- **Groq Llama 3.3 70B** correction (alternative): free tier covers heavy use
+
+## Development
+
+```bash
+pip install -e ".[dev]"
+
+# Lint + format
+ruff check .
+ruff format .
+
+# Tests (coming in PR 3)
+pytest
+```
+
+See [ARCHITECTURE.md](ARCHITECTURE.md) for extension points.
 
 ## License
 
-MIT
+MIT — see [LICENSE](LICENSE).

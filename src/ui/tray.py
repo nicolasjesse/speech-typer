@@ -1,9 +1,10 @@
 """System tray icon and menu."""
 
-from typing import Callable, Optional
-from PyQt5.QtWidgets import QSystemTrayIcon, QMenu, QAction, QApplication
-from PyQt5.QtGui import QIcon, QPixmap, QPainter, QColor, QBrush
-from PyQt5.QtCore import Qt, QSize
+from collections.abc import Callable
+
+from PyQt5.QtCore import Qt
+from PyQt5.QtGui import QBrush, QColor, QIcon, QPainter, QPixmap
+from PyQt5.QtWidgets import QAction, QMenu, QSystemTrayIcon
 
 
 class SystemTray:
@@ -17,11 +18,11 @@ class SystemTray:
 
     def __init__(
         self,
-        on_settings: Optional[Callable[[], None]] = None,
-        on_quit: Optional[Callable[[], None]] = None,
-        on_mode_change: Optional[Callable[[str], None]] = None,
-        on_language_change: Optional[Callable[[str], None]] = None,
-        on_reload: Optional[Callable[[], None]] = None,
+        on_settings: Callable[[], None] | None = None,
+        on_quit: Callable[[], None] | None = None,
+        on_mode_change: Callable[[str], None] | None = None,
+        on_language_change: Callable[[str], None] | None = None,
+        on_reload: Callable[[], None] | None = None,
     ):
         """Initialize system tray."""
         self._on_settings = on_settings
@@ -36,7 +37,7 @@ class SystemTray:
         # Create tray icon
         self._tray = QSystemTrayIcon()
         self._tray.setIcon(self._create_icon(self.Status.IDLE))
-        self._tray.setToolTip("PontySpeech - Voice Dictation")
+        self._tray.setToolTip("Holler - Voice Dictation")
 
         # Create menu
         self._menu = QMenu()
@@ -67,7 +68,9 @@ class SystemTray:
         self._transcription_action = QAction("Transcription", mode_menu)
         self._transcription_action.setCheckable(True)
         self._transcription_action.setChecked(self._mode == "transcription")
-        self._transcription_action.triggered.connect(lambda: self._set_mode_from_menu("transcription"))
+        self._transcription_action.triggered.connect(
+            lambda: self._set_mode_from_menu("transcription")
+        )
         mode_menu.addAction(self._transcription_action)
 
         self._menu.addMenu(mode_menu)
@@ -181,14 +184,16 @@ class SystemTray:
 
         # Update tooltip
         tooltips = {
-            self.Status.IDLE: "PontySpeech - Ready (Hold Ctrl+Super to record)",
-            self.Status.RECORDING: "PontySpeech - Recording...",
-            self.Status.TRANSCRIBING: "PontySpeech - Transcribing...",
-            self.Status.ERROR: "PontySpeech - Error",
+            self.Status.IDLE: "Holler - Ready (Hold Ctrl+Super to record)",
+            self.Status.RECORDING: "Holler - Recording...",
+            self.Status.TRANSCRIBING: "Holler - Transcribing...",
+            self.Status.ERROR: "Holler - Error",
         }
-        self._tray.setToolTip(tooltips.get(status, "PontySpeech"))
+        self._tray.setToolTip(tooltips.get(status, "Holler"))
 
-    def show_message(self, title: str, message: str, icon: int = QSystemTrayIcon.Information) -> None:
+    def show_message(
+        self, title: str, message: str, icon: int = QSystemTrayIcon.Information
+    ) -> None:
         """Show a notification message."""
         self._tray.showMessage(title, message, icon, 3000)
 
@@ -205,7 +210,7 @@ class SystemTray:
     def _handle_about(self) -> None:
         """Handle about menu click."""
         self._tray.showMessage(
-            "PontySpeech",
+            "Holler",
             "Voice dictation for Linux\n\nHold Ctrl + Super to record.\nRelease to transcribe and paste.",
             QSystemTrayIcon.Information,
             5000,

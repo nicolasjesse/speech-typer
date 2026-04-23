@@ -1,9 +1,9 @@
 """Audio recording using sounddevice."""
 
 import io
-import wave
 import threading
-from typing import Optional, Callable
+import wave
+
 import numpy as np
 
 
@@ -15,7 +15,7 @@ class AudioRecorder:
     DTYPE = np.int16
     MAX_DURATION = 300  # 5 minutes max
 
-    def __init__(self, device: Optional[int] = None):
+    def __init__(self, device: int | None = None):
         """Initialize recorder with optional device ID."""
         self._device = device
         self._recording = False
@@ -28,17 +28,20 @@ class AudioRecorder:
         """List available audio input devices."""
         try:
             import sounddevice as sd
+
             devices = sd.query_devices()
             input_devices = []
 
             for i, device in enumerate(devices):
                 if device["max_input_channels"] > 0:
-                    input_devices.append({
-                        "id": i,
-                        "name": device["name"],
-                        "channels": device["max_input_channels"],
-                        "default": device.get("default_samplerate", 0),
-                    })
+                    input_devices.append(
+                        {
+                            "id": i,
+                            "name": device["name"],
+                            "channels": device["max_input_channels"],
+                            "default": device.get("default_samplerate", 0),
+                        }
+                    )
 
             return input_devices
         except Exception as e:
@@ -75,7 +78,7 @@ class AudioRecorder:
             self._recording = False
             return False
 
-    def stop(self) -> Optional[bytes]:
+    def stop(self) -> bytes | None:
         """Stop recording and return WAV data."""
         with self._lock:
             if not self._recording:
@@ -106,7 +109,7 @@ class AudioRecorder:
                 if total_samples < max_samples:
                     self._audio_data.append(indata.copy())
 
-    def _get_wav_data(self) -> Optional[bytes]:
+    def _get_wav_data(self) -> bytes | None:
         """Convert recorded audio to WAV bytes."""
         if not self._audio_data:
             return None
@@ -137,6 +140,6 @@ class AudioRecorder:
             total_samples = sum(len(chunk) for chunk in self._audio_data)
             return total_samples / self.SAMPLE_RATE
 
-    def set_device(self, device_id: Optional[int]) -> None:
+    def set_device(self, device_id: int | None) -> None:
         """Set the recording device."""
         self._device = device_id

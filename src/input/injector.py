@@ -2,9 +2,8 @@
 
 import subprocess
 import time
-from typing import Optional
 
-from ..core.session import Session, SessionType
+from ..core.session import Session
 from .clipboard import Clipboard
 
 
@@ -15,7 +14,7 @@ class TextInjector:
         """Initialize injector with session info."""
         self._session = session
         self._clipboard = Clipboard(session)
-        self._original_clipboard: Optional[str] = None
+        self._original_clipboard: str | None = None
 
     def inject(self, text: str, restore_clipboard: bool = True) -> bool:
         """Inject text into active window."""
@@ -75,7 +74,7 @@ class TextInjector:
         try:
             proc = subprocess.run(
                 ["dotool"],
-                input=f"type {text}".encode("utf-8"),
+                input=f"type {text}".encode(),
                 capture_output=True,
                 timeout=10,
             )
@@ -180,7 +179,7 @@ class TextInjector:
             # dotool uses 'type' command
             proc = subprocess.run(
                 ["dotool"],
-                input=f"type {text}\n".encode("utf-8"),
+                input=f"type {text}\n".encode(),
                 capture_output=True,
                 timeout=30,
             )

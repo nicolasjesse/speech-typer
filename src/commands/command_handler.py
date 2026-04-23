@@ -1,9 +1,8 @@
 """Voice command detection and execution."""
 
-import subprocess
 import re
+import subprocess
 from dataclasses import dataclass
-from typing import Optional, Dict, List
 
 from ..core.session import Session
 
@@ -14,12 +13,12 @@ class CommandResult:
 
     is_command: bool  # True if text was recognized as a command
     executed: bool  # True if command executed successfully
-    error: Optional[str] = None  # Error message if execution failed
-    remaining_text: Optional[str] = None  # Text to inject if not a command
+    error: str | None = None  # Error message if execution failed
+    remaining_text: str | None = None  # Text to inject if not a command
 
 
 # Default keyboard commands - maps spoken phrase to key name
-DEFAULT_KEYBOARD_COMMANDS: Dict[str, str] = {
+DEFAULT_KEYBOARD_COMMANDS: dict[str, str] = {
     "enter": "Return",
     "tab": "Tab",
     "escape": "Escape",
@@ -43,8 +42,8 @@ class CommandHandler:
     def __init__(
         self,
         session: Session,
-        keyboard_commands: Optional[Dict[str, str]] = None,
-        shell_commands: Optional[Dict[str, str]] = None,
+        keyboard_commands: dict[str, str] | None = None,
+        shell_commands: dict[str, str] | None = None,
         enabled: bool = True,
     ):
         """Initialize command handler.
@@ -69,11 +68,11 @@ class CommandHandler:
         """Enable or disable command detection."""
         self._enabled = enabled
 
-    def set_shell_commands(self, commands: Dict[str, str]) -> None:
+    def set_shell_commands(self, commands: dict[str, str]) -> None:
         """Update shell commands configuration."""
         self._shell_commands = commands
 
-    def set_keyboard_commands(self, commands: Dict[str, str]) -> None:
+    def set_keyboard_commands(self, commands: dict[str, str]) -> None:
         """Update keyboard commands configuration (merges with defaults)."""
         self._keyboard_commands = DEFAULT_KEYBOARD_COMMANDS.copy()
         if commands:
@@ -97,7 +96,7 @@ class CommandHandler:
         normalized = text.strip().lower()
 
         # Remove trailing punctuation for matching
-        normalized_clean = re.sub(r'[.!?,;:]+$', '', normalized).strip()
+        normalized_clean = re.sub(r"[.!?,;:]+$", "", normalized).strip()
 
         print(f"[VoiceCmd] Checking: '{normalized_clean}' (original: '{text}')")
 
@@ -180,7 +179,7 @@ class CommandHandler:
             print(f"[VoiceCmd] Using dotool: key {dotool_key}")
             proc = subprocess.run(
                 ["dotool"],
-                input=f"key {dotool_key}\n".encode("utf-8"),
+                input=f"key {dotool_key}\n".encode(),
                 capture_output=True,
                 timeout=5,
             )
@@ -251,7 +250,7 @@ class CommandHandler:
         }
         return key_map.get(key, key)
 
-    def _run_shell_command(self, command: str) -> tuple[bool, Optional[str]]:
+    def _run_shell_command(self, command: str) -> tuple[bool, str | None]:
         """Run a shell command.
 
         Returns (success, error_message).
@@ -271,7 +270,7 @@ class CommandHandler:
             print(error)
             return False, error
 
-    def get_all_commands(self) -> Dict[str, Dict[str, str]]:
+    def get_all_commands(self) -> dict[str, dict[str, str]]:
         """Get all configured commands for display."""
         return {
             "keyboard": self._keyboard_commands.copy(),

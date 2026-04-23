@@ -1,9 +1,11 @@
 """Wayland global hotkey handling using evdev (requires input group)."""
 
+import contextlib
 import os
-import threading
 import select
-from typing import Callable, Optional, List, Set
+import threading
+from collections.abc import Callable
+from typing import ClassVar
 
 
 class HotkeyEvdev:
@@ -15,18 +17,18 @@ class HotkeyEvdev:
     """
 
     # Evdev key codes for modifiers
-    KEY_CODES = {
-        "ctrl": {29, 97},      # Left Ctrl, Right Ctrl
-        "super": {125, 126},   # Left Super, Right Super
-        "alt": {56, 100},      # Left Alt, Right Alt
-        "shift": {42, 54},     # Left Shift, Right Shift
+    KEY_CODES: ClassVar[dict[str, set[int]]] = {
+        "ctrl": {29, 97},  # Left Ctrl, Right Ctrl
+        "super": {125, 126},  # Left Super, Right Super
+        "alt": {56, 100},  # Left Alt, Right Alt
+        "shift": {42, 54},  # Left Shift, Right Shift
     }
 
     def __init__(
         self,
-        modifiers: List[str],
-        on_press: Optional[Callable[[], None]] = None,
-        on_release: Optional[Callable[[], None]] = None,
+        modifiers: list[str],
+        on_press: Callable[[], None] | None = None,
+        on_release: Callable[[], None] | None = None,
     ):
         """Initialize hotkey listener.
 
@@ -40,12 +42,12 @@ class HotkeyEvdev:
         self._on_release = on_release
         self._devices = []
         self._running = False
-        self._thread: Optional[threading.Thread] = None
-        self._pressed_keys: Set[int] = set()
+        self._thread: threading.Thread | None = None
+        self._pressed_keys: set[int] = set()
         self._hotkey_active = False
 
         # Build set of all key codes we care about
-        self._all_modifier_codes: Set[int] = set()
+        self._all_modifier_codes: set[int] = set()
         for mod in self._modifiers:
             if mod in self.KEY_CODES:
                 self._all_modifier_codes.update(self.KEY_CODES[mod])
@@ -187,15 +189,13 @@ class HotkeyEvdev:
             self._thread = None
 
         for device in self._devices:
-            try:
+            with contextlib.suppress(Exception):
                 device.close()
-            except Exception:
-                pass
         self._devices = []
         self._pressed_keys.clear()
         self._hotkey_active = False
 
-    def set_modifiers(self, modifiers: List[str]) -> None:
+    def set_modifiers(self, modifiers: list[str]) -> None:
         """Change the hotkey modifiers."""
         was_running = self._running
         if was_running:
@@ -227,12 +227,7 @@ class HotkeyEvdev:
 
         # Check if in input group
         try:
-            result = subprocess.run(
-                ["groups"],
-                capture_output=True,
-                text=True,
-                timeout=5
-            )
+            result = subprocess.run(["groups"], capture_output=True, text=True, timeout=5)
             groups = result.stdout.split()
 
             if "input" not in groups:

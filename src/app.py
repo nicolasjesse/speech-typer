@@ -2,22 +2,21 @@
 
 import sys
 import threading
-from typing import Optional
 
+from PyQt5.QtCore import QObject, QTimer, pyqtSignal
 from PyQt5.QtWidgets import QApplication, QMessageBox
-from PyQt5.QtCore import QObject, pyqtSignal, QTimer
 
-from .core.session import Session
-from .core.config import Config
 from .audio.recorder import AudioRecorder
-from .transcription.groq_client import GroqTranscriber
-from .text.formatter import TextFormatter
-from .text.corrector import TextCorrector
-from .input.injector import TextInjector
 from .commands.command_handler import CommandHandler
-from .ui.tray import SystemTray
+from .core.config import Config
+from .core.session import Session
+from .input.injector import TextInjector
+from .text.corrector import TextCorrector
+from .text.formatter import TextFormatter
+from .transcription.groq_client import GroqTranscriber
 from .ui.overlay import RecordingOverlay
 from .ui.settings import SettingsDialog
+from .ui.tray import SystemTray
 
 
 class SignalBridge(QObject):
@@ -29,7 +28,7 @@ class SignalBridge(QObject):
     error = pyqtSignal(str)
 
 
-class PontySpeechApp:
+class HollerApp:
     """Main application orchestrating all components."""
 
     def __init__(self):
@@ -123,6 +122,7 @@ class PontySpeechApp:
         """Create appropriate hotkey handler for session type."""
         if self._session.is_wayland:
             from .input.hotkey_evdev import HotkeyEvdev
+
             return HotkeyEvdev(
                 self._config.hotkey_modifiers,
                 on_press=self._on_hotkey_press,
@@ -130,6 +130,7 @@ class PontySpeechApp:
             )
         else:
             from .input.hotkey_x11 import HotkeyX11
+
             return HotkeyX11(
                 self._config.hotkey_modifiers,
                 on_press=self._on_hotkey_press,
@@ -146,12 +147,11 @@ class PontySpeechApp:
             QMessageBox.critical(
                 None,
                 "Error",
-                "Failed to start hotkey listener.\n"
-                "Check permissions and try again.",
+                "Failed to start hotkey listener.\nCheck permissions and try again.",
             )
             return 1
 
-        print(f"PontySpeech started. Hold {self._config.get_hotkey_name()} to record.")
+        print(f"Holler started. Hold {self._config.get_hotkey_name()} to record.")
 
         # Run Qt event loop
         return self._qt_app.exec_()
@@ -266,7 +266,7 @@ class PontySpeechApp:
 
     def _reload_config(self) -> None:
         """Reload configuration from disk and apply changes."""
-        print("[PontySpeech] Reloading configuration...")
+        print("[Holler] Reloading configuration...")
 
         # Reload config from disk
         self._config = Config.load()
@@ -301,7 +301,7 @@ class PontySpeechApp:
 
         # Show confirmation
         self._tray.show_message("Config Reloaded", "Configuration has been reloaded successfully.")
-        print("[PontySpeech] Configuration reloaded.")
+        print("[Holler] Configuration reloaded.")
 
     def _quit(self) -> None:
         """Quit the application."""

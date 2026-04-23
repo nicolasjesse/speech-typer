@@ -1,8 +1,8 @@
 """Recording indicator overlay."""
 
-from PyQt5.QtWidgets import QWidget, QLabel, QVBoxLayout, QApplication
-from PyQt5.QtCore import Qt, QTimer, QPropertyAnimation, QEasingCurve
-from PyQt5.QtGui import QPainter, QColor, QBrush, QPen
+from PyQt5.QtCore import Qt, QTimer
+from PyQt5.QtGui import QBrush, QColor, QPainter
+from PyQt5.QtWidgets import QApplication, QLabel, QVBoxLayout, QWidget
 
 
 class RecordingOverlay(QWidget):
@@ -18,11 +18,11 @@ class RecordingOverlay(QWidget):
         """Setup the overlay UI."""
         # Window flags for floating overlay - avoid stealing focus
         self.setWindowFlags(
-            Qt.WindowStaysOnTopHint |
-            Qt.FramelessWindowHint |
-            Qt.Tool |
-            Qt.WindowDoesNotAcceptFocus |
-            Qt.BypassWindowManagerHint
+            Qt.WindowStaysOnTopHint
+            | Qt.FramelessWindowHint
+            | Qt.Tool
+            | Qt.WindowDoesNotAcceptFocus
+            | Qt.BypassWindowManagerHint
         )
         self.setAttribute(Qt.WA_TranslucentBackground)
         self.setAttribute(Qt.WA_ShowWithoutActivating)
